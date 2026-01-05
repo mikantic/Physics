@@ -20,12 +20,12 @@ namespace Physics.Forces
 
     public interface IFriction
     {
-        public Range01 Friction { get; }
+        public Ratio Friction { get; }
     }
 
     public interface IBounce
     {
-        public Range01 Bounce { get; }
+        public Ratio Bounce { get; }
     }
 
     public interface IForce

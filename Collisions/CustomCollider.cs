@@ -12,8 +12,8 @@ namespace Physics.Colliders
     [RequireComponent(typeof(Transform))]
     public class CustomCollider : MeshCollider, ICollider
     {
-        public Range01 Friction { get; }
-        public Range01 Bounce { get; }
+        public Ratio Friction { get; }
+        public Ratio Bounce { get; }
         public Vector3 Force { get; }
     }
 
