@@ -1,35 +1,58 @@
 using Core.Tools;
+using Physics.Numerics;
 using UnityEngine;
 
-namespace Physics.Forces
+namespace Physics
 {
-    public static class ForceExtensions
+    public struct Force
     {
-        public static double GetFriction(object value)
+        public Vector3 Acceleration;
+        public float MaxMagnitude;
+
+        public Force(Vector3 acceleration, float maxMagnitude = 50f)
         {
-            if (value is IFriction friction) return friction.Friction;
-            return 0;
+            Acceleration = acceleration;
+            MaxMagnitude = maxMagnitude;
         }
 
-        public static double GetBounce(object value)
+        public void ValidateWithMagnitude(Vector3 velocity)
         {
-            if (value is IBounce bounce) return bounce.Bounce;
-            return 0;
+            Acceleration = Acceleration.Adjust(velocity, MaxMagnitude);
         }
-    }
 
-    public interface IFriction
-    {
-        public Ratio Friction { get; }
-    }
+        public static Force operator -(Force force)
+        {
+            return new Force(
+                acceleration: -force.Acceleration,
+                maxMagnitude: force.MaxMagnitude
+            );
+        }
 
-    public interface IBounce
-    {
-        public Ratio Bounce { get; }
-    }
+        public static Force operator +(Force a, Force b)
+        {
+            return new Force(
+                acceleration: a.Acceleration + b.Acceleration,
+                maxMagnitude: Mathf.Max(a.MaxMagnitude, b.MaxMagnitude)
+            );
+        }
 
-    public interface IForce
-    {
-        public Vector3 Force { get; }
+        public static Force operator -(Force a, Force b)
+        {
+            return new Force(
+                acceleration: a.Acceleration - b.Acceleration,
+                maxMagnitude: Mathf.Max(a.MaxMagnitude, b.MaxMagnitude)
+            );
+        }
+
+        public static Force operator *(Force force, float scaler)
+        {
+            return new Force(
+                acceleration: force.Acceleration * scaler,
+                maxMagnitude: force.MaxMagnitude
+            );
+        }
+
+        public static Force Gravity = new Force(Vector3.down * 20f * Time.fixedDeltaTime);
+        public static Force Empty = new Force(Vector3.zero, 0);
     }
 }
