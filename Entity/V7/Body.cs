@@ -28,8 +28,6 @@ namespace Physics
             ForceType forceType = ForceType.Global)
         {
             if (!force.InBounds(magnitude, Velocity(forceType))) return; 
-
-            Debug.Log($"Add Force: {force}  Normal {_contacts.Normal}");  
             _rigidbody.AddForce(force, ForceMode.VelocityChange);
         }
 

@@ -19,7 +19,6 @@ namespace Physics
 
         private bool PointValidation(Contact contact)
         {
-            Debug.Log($"Validation {contact.Normal}  {contact.Normal.Dot(_contacts.Normal)}  {_contacts.Normal}");
             return contact.Normal.Dot(_contacts.Normal) >= _transitionDotMinimum;
         }
 
