@@ -16,16 +16,6 @@ namespace Physics
         public Vector3 Velocity =>  _rigidbody?.GetPointVelocity(_point) ?? Vector3.zero;
 
         public Contact(
-            Vector3 normal,
-            Vector3 point,
-            Rigidbody rigidbody)
-        {
-            _normal = normal.normalized;
-            _point = point;
-            _rigidbody = rigidbody;
-        }
-
-        public Contact(
             Collision collision)
         {
             _normal = collision.Normal().normalized;

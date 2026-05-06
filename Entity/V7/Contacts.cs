@@ -9,7 +9,6 @@ namespace Physics
     public sealed class Contacts : MonoBehaviour
     {
         public Map<Collider, Contact> Points { get; } = new();
-
         private Vector3 _normal = Vector3.up;
         public Vector3 Normal
         {

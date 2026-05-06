@@ -46,10 +46,10 @@ public class PlatformHelper : MonoBehaviour
     {
         if (_goalPositions.Length <= 0) return;
 
-        Vector3 direction = (_goalPositions[_goalIndex] - transform.position).normalized * _speed;
+        Vector3 direction = (_goalPositions[_goalIndex] - transform.localPosition).normalized * _speed;
         _rigidbody.linearVelocity = direction;
 
-        if (Vector3.Distance(_goalPositions[_goalIndex], transform.position) <= _margin)
+        if (Vector3.Distance(_goalPositions[_goalIndex], transform.localPosition) <= _margin)
         {
             _goalIndex += _direction;
             if (_loop)
