@@ -11,7 +11,7 @@ namespace Physics.Influences
         public Vector3 GetFlowForce(out float magnitude)
         {
             Vector3 force = Influencers.Data.Values
-                .Select(contact => contact.Flow)
+                .Select(contact => contact.Flow(_body.transform.position))
                 .Average(emptyResult: Vector3.zero); 
 
             magnitude = force.magnitude;

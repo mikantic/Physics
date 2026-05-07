@@ -8,8 +8,8 @@ namespace Physics.Influences
 {
     public class Volume : Influencer
     {
-        private readonly VolumeFlow _flow;
-        public Vector3 Flow => _flow?.Flow ?? Vector3.zero;
+        private readonly IVolumeFlow _flow;
+        public Vector3 Flow(Vector3 position) => _flow?.Flow(position) ?? Vector3.zero;
         public float Density => _flow?.Density ?? 0;
 
         public Volume(Collider collider, Vector3 point) : base(point, collider.gameObject)
