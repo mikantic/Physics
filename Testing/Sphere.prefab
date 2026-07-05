@@ -171,9 +171,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _adhesionDotMaximum: -0.71
-  _transitionDotMinimum: 0.71
   _contacts: {fileID: 6377081044258845011}
   _rotateWithNormal: 0
+  _strength: 3
 --- !u!114 &2154694188235717130
 MonoBehaviour:
   m_ObjectHideFlags: 0

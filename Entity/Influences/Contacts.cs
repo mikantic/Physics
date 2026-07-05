@@ -23,7 +23,7 @@ namespace Physics.Influences
             }
 
             _normal = Influencers.Data.Values.Select(contact => contact.Normal).Average(
-                emptyResult: -UnityEngine.Physics.gravity.normalized);
+                emptyResult: UnityEngine.Physics.gravity.normalized);
         }
 
         protected override void UpdateInfluence(Collider collider, Contact influencer)

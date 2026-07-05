@@ -5,8 +5,6 @@ namespace Physics
 {
     public static class Utils
     {
-        public static Contact ToContact(this Collision collision) => new Contact(collision);
-
         public static bool InBounds(this ref Vector3 force, float magnitude, Vector3 velocity)
         {
             float delta = velocity.InDirection(force) - magnitude;

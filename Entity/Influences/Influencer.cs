@@ -9,13 +9,9 @@ namespace Physics.Influences
         public Vector3 Point {get => _point; }
 
         private readonly Rigidbody _rigidbody;
-        public Vector3 Velocity 
+        public Vector3 Velocity(Vector3 position)
         { 
-            get
-            {
-                if (_rigidbody == null) return Vector3.zero;
-                return _rigidbody.GetPointVelocity(Point);
-            }
+           return _rigidbody?.GetPointVelocity(position) ?? Vector3.zero;
         }
 
         protected Influencer(Vector3 point, GameObject gameObject)

@@ -1,24 +1,25 @@
 using Unity.VisualScripting;
 using UnityEngine;
+using Physics.Influences;
 
 namespace Physics
 {
     [RequireComponent(typeof(Rigidbody))]
-    [RequireComponent(typeof(Influences.Contacts))]
-    [RequireComponent(typeof(Influences.Volumes))]
+    [RequireComponent(typeof(Contacts))]
+    [RequireComponent(typeof(Volumes))]
     [RequireComponent(typeof(Adhesion))]
     public sealed class Body : MonoBehaviour
     {
         [SerializeField] private Rigidbody _rigidbody;
-        [SerializeField] private Influences.Contacts _contacts;
-        [SerializeField] private Influences.Volumes _volumes;
+        [SerializeField] private Contacts _contacts;
+        [SerializeField] private Volumes _volumes;
         [SerializeField] private Adhesion _adhesion;
 
         [Range(0,1)]
         [SerializeField] private float _buoyancy = 0.75f;
 
         public Vector3 GlobalVelocity => _rigidbody.linearVelocity;
-        public Vector3 LocalVelocity => GlobalVelocity - _contacts.Velocity;
+        public Vector3 LocalVelocity => GlobalVelocity - _contacts.Velocity(transform.position);
 
         #if UNITY_EDITOR
         private void Reset()
@@ -58,8 +59,8 @@ namespace Physics
             );
 
             AddForce(
-                force: _contacts.Velocity,
-                magnitude: _contacts.Velocity.magnitude,
+                force: _contacts.Velocity(transform.position),
+                magnitude: _contacts.Velocity(transform.position).magnitude,
                 forceType: ForceType.Global
             );
 
@@ -67,6 +68,12 @@ namespace Physics
                 force: _volumes.GetBuoyantForce(out float buoyantMagnitude) * _buoyancy,
                 magnitude: buoyantMagnitude,
                 forceType: ForceType.Global
+            );
+
+            AddForce(
+                force: _volumes.GetResistanceForce(out float resistaceMagnitude),
+                magnitude: resistaceMagnitude,
+                forceType: ForceType.Local
             );
 
             AddForce(

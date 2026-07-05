@@ -1,10 +1,11 @@
 using Core.Numerics;
 using Core.Tools;
 using UnityEngine;
+using Physics.Influences;
 
 namespace Physics
 {
-    [RequireComponent(typeof(Influences.Contacts))]
+    [RequireComponent(typeof(Contacts))]
     public sealed class Adhesion : MonoBehaviour
     {
         /// <summary>
@@ -12,13 +13,9 @@ namespace Physics
         /// </summary>
         [SerializeField] [Range(-1f, 1f)] private float _adhesionDotMaximum = -0.71f;
 
-        /// <summary>
-        /// maximum dot angle between normals object can move across
-        /// </summary>
-        [SerializeField] [Range(0f, 1f)] private float _transitionDotMinimum = 0.71f;
-
-        [SerializeField] private Influences.Contacts _contacts;
+        [SerializeField] private Contacts _contacts;
         [SerializeField] private bool _rotateWithNormal;
+        [SerializeField] private float _strength = 3f;
 
         #if UNITY_EDITOR
         private void Reset()
@@ -33,9 +30,9 @@ namespace Physics
             set => _adhesionDotMaximum = value;
         }
 
-        private bool PointValidation(Influences.Contact contact)
+        private bool PointValidation(Contact contact)
         {
-            return contact.Normal.Dot(_contacts.Normal) >= _transitionDotMinimum;
+            return contact.Normal.Dot(UnityEngine.Physics.gravity.normalized) <= _adhesionDotMaximum;
         }
 
         private void Awake() => _contacts.Influencers.Validation = PointValidation;
@@ -56,7 +53,7 @@ namespace Physics
             float dot = Vector3.Dot(_contacts.Normal, UnityEngine.Physics.gravity.normalized);
             if (dot > AdhesionDotMaximum) return Vector3.zero;
 
-            Vector3 force = -UnityEngine.Physics.gravity - _contacts.Normal * 2f;
+            Vector3 force = -UnityEngine.Physics.gravity - _contacts.Normal * _strength;
             magnitude = force.magnitude;
             return force * Time.fixedDeltaTime;
         }

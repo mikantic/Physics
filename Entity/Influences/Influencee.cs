@@ -9,7 +9,7 @@ namespace Physics.Influences
     {
         public Map<Collider, I> Influencers { get; } = new();
 
-        public Vector3 Velocity => Influencers.Data.Values.Select(contact => contact.Velocity).Sum();
+        public Vector3 Velocity(Vector3 position) => Influencers.Data.Values.Select(contact => contact.Velocity(position)).Average(emptyResult: Vector3.zero);
 
         protected virtual void UpdateInfluence(Collider collider, I influencer)
         {
