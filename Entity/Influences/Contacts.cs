@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Core.Numerics;
+using Core.Tools;
 using UnityEngine;
 
 namespace Physics.Influences
@@ -8,22 +9,19 @@ namespace Physics.Influences
     public class Contacts : Influencee<Contact>
     {
         [SerializeField] protected LayerMask _layers;
-        private Vector3 _normal = Vector3.up;
-        public Vector3 Normal
-        {
-            get => _normal;
-        }
+
+        public Observable<Vector3> Normal { get; } = new(-UnityEngine.Physics.gravity.normalized);
 
         private void RecalculateNormal()
         {
             if (Influencers.Count <= 0) 
             {
-                _normal = UnityEngine.Physics.gravity.normalized;
+                Normal.Value = -UnityEngine.Physics.gravity.normalized;
                 return;
             }
 
-            _normal = Influencers.Data.Values.Select(contact => contact.Normal).Average(
-                emptyResult: UnityEngine.Physics.gravity.normalized);
+            Normal.Value = Influencers.Data.Values.Select(contact => contact.Normal).Average(
+                emptyResult: -UnityEngine.Physics.gravity.normalized);
         }
 
         protected override void UpdateInfluence(Collider collider, Contact influencer)
@@ -58,8 +56,8 @@ namespace Physics.Influences
 
         public void Clear()
         {
-            List<Collider> colliders = Influencers.Data.Keys.ToList();
-            colliders.ForEach(collider => RemoveInfluence(collider));
+            IEnumerable<Collider> colliders = Influencers.Data.Keys.ToList();
+            foreach (Collider collider in colliders) RemoveInfluence(collider);
         }
     }
 }

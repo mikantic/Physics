@@ -5,8 +5,7 @@ namespace Physics.Influences
 {
     public abstract class Influencer
     {
-        private readonly Vector3 _point;
-        public Vector3 Point {get => _point; }
+        public readonly Vector3 Point;
 
         private readonly Rigidbody _rigidbody;
         public Vector3 Velocity(Vector3 position)
@@ -16,7 +15,7 @@ namespace Physics.Influences
 
         protected Influencer(Vector3 point, GameObject gameObject)
         {
-            _point = point;
+            Point = point;
             gameObject.TryGetComponent(out _rigidbody);
         }
     }

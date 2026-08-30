@@ -29,7 +29,17 @@ namespace Physics
             TryGetComponent(out _adhesion);
             TryGetComponent(out _volumes);
         }
-        #endif
+#endif
+
+        private void Awake()
+        {
+            _contacts.Influencers.OnAdded += TryProjectVelocity;
+        }
+
+        private void TryProjectVelocity(Contact contact)
+        {
+            _rigidbody.linearVelocity = LocalVelocity.Project(contact.Normal, true);
+        }
 
         private Vector3 Velocity(
             ForceType forceType = ForceType.Global)

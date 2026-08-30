@@ -53,7 +53,7 @@ namespace Physics
             float dot = Vector3.Dot(_contacts.Normal, UnityEngine.Physics.gravity.normalized);
             if (dot > AdhesionDotMaximum) return Vector3.zero;
 
-            Vector3 force = -UnityEngine.Physics.gravity - _contacts.Normal * _strength;
+            Vector3 force = -UnityEngine.Physics.gravity - _contacts.Normal.Value * _strength;
             magnitude = force.magnitude;
             return force * Time.fixedDeltaTime;
         }

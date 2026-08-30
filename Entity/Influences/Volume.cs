@@ -38,7 +38,6 @@ namespace Physics.Influences
         public Vector3 GetBuoyantForce(Collider collider, out float magnitude)
         {
             float depth = Mathf.Min(GetDepth(collider), 1.1f);
-            Debug.Log(depth);
             Vector3 force = -UnityEngine.Physics.gravity;
             magnitude = force.magnitude;
             return force * depth * Density * Time.fixedDeltaTime;
