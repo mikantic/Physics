@@ -1,62 +1,70 @@
 using UnityEngine;
 using Core.Numerics;
-using Core.Tools;
 using System.Linq;
 
 namespace Physics.Numerics
 {
-    public sealed class Friction : FloatRange
-    {
-        public Friction(float value) : base(value, 0, 1) {}
-    }
-
     public static class Math
     {
-        public static float Friction(this Collider collider) => collider.material.dynamicFriction;
-
-        public static FrictionType Reverse(this FrictionType frictionType)
-        {
-            return frictionType switch
-            {
-                FrictionType.Against => FrictionType.With,
-                FrictionType.With or _ => FrictionType.Against
-            };
-        }
-
-        public static Vector3 Along(
+        
+        /// <summary>
+        /// get a vector projected on a plane if it is able to be
+        /// </summary>
+        /// <param name="vector">input vector</param>
+        /// <param name="normal">normal</param>
+        /// <param name="minDot">lowest dot value until it returns 0</param>
+        /// <param name="maxDot">largest dot value until it returns input vector</param>
+        /// <param name="preserveMagnitude">if projected vector preserves input magnitude</param>
+        /// <returns></returns>
+        public static Vector3 Project(
             this Vector3 vector, 
             Vector3 normal, 
-            double maxDot = 0,
-            double minDot = Core.Numerics.Math.DOT_135, 
-            ForceMagnitude forceMagnitude = ForceMagnitude.Project)
+            float nullifiedDot = -.707f, 
+            float projectedDot = 0f,
+            bool preserveMagnitude = false)
         {
             float dot = vector.Dot(normal);
-            if (dot >= maxDot) return vector;
-            if (dot < minDot) 
-            {
-                return Vector3.zero;
-            }
-            if (forceMagnitude == ForceMagnitude.Maintain)
-            {
-                float magnitude = vector.magnitude;
-                return Vector3.ProjectOnPlane(vector, normal).normalized * magnitude;
-            }
-            return Vector3.ProjectOnPlane(vector, normal);
+            if (dot < nullifiedDot) return Vector3.zero;
+            if (dot > projectedDot) return vector;
+            Vector3 result = Vector3.ProjectOnPlane(vector, normal);
+            if (preserveMagnitude) return result.normalized * vector.magnitude;
+            return result;
         }
 
-
-
-
-        public static float Bounce(this Collider collider) => collider.material.bounciness;
-        public static Vector3 Normal(this Collision collision) => collision.contacts.Select(contact => contact.normal).Average();
-        public static Vector3 Point(this Collision collision) => collision.contacts.Select(contact => contact.point).Average();
-
-        public static Vector3 Adjust(this Vector3 force, Vector3 velocity, double maxMagnitude = 50)
+        /// <summary>
+        /// projects on plane with magnitude option
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <param name="normal"></param>
+        /// <param name="preserveMagnitude"></param>
+        /// <returns></returns>
+        public static Vector3 Project(
+            this Vector3 vector, 
+            Vector3 normal, 
+            bool preserveMagnitude = false // maybe make this enum? default, perserve, normalize?
+        )
         {
-            float velocityMagnitude = velocity.InDirection(force);
-            if (velocityMagnitude >= maxMagnitude) return Vector3.zero;
-            if (velocityMagnitude + force.magnitude <= maxMagnitude) return force;
-            return force.normalized * (float)(maxMagnitude - velocityMagnitude);
+            Vector3 result = Vector3.ProjectOnPlane(vector, normal);
+            if (preserveMagnitude) return result.normalized * vector.magnitude;
+            return result;
+        }
+
+        /// <summary>
+        /// returns a vector clamped to a magnitude compared to a reference vector
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="reference"></param>
+        /// <returns></returns>
+        public static Vector3 Clamp(this Vector3 vector, float magnitude, Vector3 reference)
+        {
+            float inDirection = reference.InDirection(vector);
+            if (inDirection >= magnitude) return Vector3.zero;
+
+            float remaining = magnitude - inDirection;
+            if (remaining < vector.magnitude) return remaining * vector.normalized;
+
+            return vector;
         }
     }
 }
