@@ -1,177 +1,420 @@
 using System.Collections.Generic;
 using Core.Numerics;
 using Physics.Numerics;
-using Saveur;
 using UnityEngine;
+
 namespace Physics
 {
-    public enum FrictionMode
-    {
-        Against, With, None
-    }
-
-    public enum DurationMode
-    {
-        Instant, Continuous
-    }
-
-    public enum ReferenceMode
-    {
-        Local, Global
-    }
-
-
+    /// <summary>
+    /// wrapper class for rigidbody to allow more control with forces and contacts
+    /// </summary>
     public partial class Body : MonoBehaviour
     {
+        #region Fields
+        
+        /// <summary>
+        /// rigidbody
+        /// </summary>
         [SerializeField] protected Rigidbody body;
-        protected Dictionary<Collider, CollisionData> contacts { get; } = new();
 
-        protected Vector3 contactVelocity;
-        protected Vector3 localVelocity => body.linearVelocity - contactVelocity;
+        #endregion
+        #region Properties
 
-        protected float minimumValue = 0.001f;
+        /// <summary>
+        /// contact collection
+        /// </summary>
+        protected Dictionary<Collider, Contact> contacts { get; } = new();
 
-        protected virtual void UpdateContactVelocity()
+        /// <summary>
+        /// max friction
+        /// </summary>
+        protected float? friction { get; set; } = null;
+
+        /// <summary>
+        /// average contact normal
+        /// </summary>
+        protected Vector3? normal { get; set; } = null;
+
+        /// <summary>
+        /// average contact normal for valid slopes
+        /// </summary>
+        protected Vector3? validNormal { get; set; } = null;
+
+        /// <summary>
+        /// average velocity of contacts
+        /// </summary>
+        protected Vector3? contactVelocity = null;
+
+        /// <summary>
+        /// zone collection
+        /// </summary>
+        protected Dictionary<Collider, Zone> zones { get; } = new();
+
+        /// <summary>
+        /// average velocity of zones
+        /// </summary>
+        protected Vector3? zoneVelocity = null;
+
+        /// <summary>
+        /// highest resistance of zones
+        /// </summary>
+        protected float? resistance { get; set; } = null;
+
+        /// <summary>
+        /// velocity local to contacts
+        /// </summary>
+        protected Vector3 localVelocity
         {
-            Vector3 velocity = Vector3.zero;
-            int count = 0;
-            foreach (var (collider, data) in contacts)
+            get
             {
-                if (data.Rigidbody == null) continue;
-                velocity += data.PointVelocity;
-                count++;
+                return body.linearVelocity - (contactVelocity ?? Vector3.zero) - (zoneVelocity ?? Vector3.zero);
             }
-            if (count <= 0) contactVelocity = Vector3.zero;
-            else contactVelocity = velocity / count;
         }
 
+        #endregion
+        #region Helper Methods
+
+        /// <summary>
+        /// if a vector is large enough to be valid
+        /// </summary>
+        /// <param name="force"></param>
+        /// <returns></returns>
+        protected bool ValidStrength(Vector3 force) => force.sqrMagnitude > 0.0001f;
+
+        /// <summary>
+        /// applies delta velocit if any from data and updates given properties
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="collider"></param>
+        /// <param name="velocity"></param>
+        /// <param name="count"></param>
+        protected void ApplyDeltaVelocity(Collider collider, Data data, ref Vector3? velocity, ref int count)
+        {
+            if (data.UpdateVelocity(collider.attachedRigidbody, out Vector3 delta))
+            {
+                body.linearVelocity += delta;
+                velocity = (velocity ?? Vector3.zero) + data.Velocity;
+                count++;
+            }
+        }
+
+        /// <summary>
+        /// applies contacts to force
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="dotBounds"></param>
+        /// <param name="preserveMagnitude"></param>
+        /// <returns></returns>
+        protected bool TryApplyContacts(ref Vector3 force, DotBounds dotBounds, bool preserveMagnitude)
+        {
+            float dot;
+            foreach(var (collider, contact) in contacts)
+            {
+                dot = force.Dot(contact.Normal);
+                if (dot < dotBounds.Nullified) return false;
+                if (dot < dotBounds.Projected) force = force.Project(contact.Normal, preserveMagnitude);
+            }
+
+            return ValidStrength(force);
+        }
+
+        /// <summary>
+        /// applies friction mode to force
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="frictionMode"></param>
+        /// <returns></returns>
+        protected bool TryApplyFrictionMode(ref Vector3 force, FrictionMode frictionMode)
+        {
+            switch(frictionMode)
+            {
+                case FrictionMode.Against:
+                    force *= 1f - (friction ?? 0f);
+                    break;
+                case FrictionMode.With:
+                    force *= friction ?? 0f;
+                    break;
+            }
+
+            return ValidStrength(force);
+        }
+
+        /// <summary>
+        /// applies duration to force
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="durationMode"></param>
+        /// <returns></returns>
+        protected bool TryApplyDurationMode(ref Vector3 force, DurationMode durationMode)
+        {
+            switch(durationMode)
+            {
+                case DurationMode.Continuous:
+                    force *= Time.fixedDeltaTime;
+                    break;
+            }
+
+            return ValidStrength(force);
+        }
+
+        /// <summary>
+        /// applies reference to force
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="referenceMode"></param>
+        /// <returns></returns>
+        protected bool TryApplyReferenceMode(ref Vector3 force, float magnitude, ReferenceMode referenceMode)
+        {
+            switch (referenceMode)
+            {
+                case ReferenceMode.Local:
+                    force = force.Clamp(magnitude, localVelocity);
+                    break;
+                case ReferenceMode.Global:
+                    force = force.Clamp(magnitude, body.linearVelocity);
+                    break;
+            }
+
+            return ValidStrength(force);
+        }
+
+        /// <summary>
+        /// applies zones to force and magntiude
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="magnitude"></param>
+        /// <returns></returns>
+        protected bool TryApplyZones(ref float magnitude)
+        {
+            if (resistance.HasValue) magnitude *= 1f - resistance.Value;
+            return true;
+        }
+
+        #endregion
+        #region Force Methods
+
+        /// <summary>
+        /// updates contact related values and applies changes in contact velocities
+        /// </summary>
+        protected virtual void ApplyContacts()
+        {
+            friction = null;
+            normal = null;
+            validNormal = null;
+            int validCount = 0;
+            contactVelocity = null;
+            int velocityCount = 0;
+            foreach (var (collider, contact) in contacts)
+            {
+                friction = Mathf.Max(friction ?? 0, contact.Friction);
+                normal = (normal ?? Vector3.zero) + contact.Normal;
+                if (contact.Normal.Dot(Vector3.down) < -0.7f)
+                {
+                    validNormal = (validNormal ?? Vector3.zero) + contact.Normal;
+                    validCount++;  
+                } 
+                ApplyDeltaVelocity(collider, contact, ref contactVelocity, ref velocityCount);
+            }
+            if (contacts.Count > 0) normal /= contacts.Count;
+            if (validCount > 0) validNormal /= validCount;
+            if (velocityCount > 0) contactVelocity /= velocityCount;
+        }
+
+        /// <summary>
+        /// applies global gravitational force
+        /// </summary>
+        protected virtual void ApplyGravity()
+        {
+            if (validNormal.HasValue) 
+            {
+                AddForce(-validNormal.Value, 1, DurationMode.Continuous, FrictionMode.None, ReferenceMode.Local, false);
+                return;
+            }
+            AddForce(UnityEngine.Physics.gravity, DurationMode.Continuous, FrictionMode.Against, ReferenceMode.Global, false);
+        }
+
+        /// <summary>
+        /// applies friction force to local velocity
+        /// </summary>
+        protected virtual void ApplyFriction()
+        {
+            if (!friction.HasValue) return;
+            body.AddForce(-localVelocity * friction.Value, ForceMode.Acceleration);
+        }
+
+        /// <summary>
+        /// applies zone related forces and values
+        /// </summary>
+        protected virtual void ApplyZones()
+        {
+            resistance = null;
+            zoneVelocity = null;
+            int velocityCount = 0;
+            foreach(var (collider, zone) in zones)
+            {
+                resistance = Mathf.Max(resistance ?? 0, zone.Resistance);
+                ApplyDeltaVelocity(collider, zone, ref zoneVelocity, ref velocityCount);
+            }
+            if (velocityCount > 0) zoneVelocity /= velocityCount;
+        }
+
+        /// <summary>
+        /// adds a force with parameters
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="dotBounds"></param>
+        /// <param name="durationMode"></param>
+        /// <param name="frictionMode"></param>
+        /// <param name="referenceMode"></param>
+        /// <param name="preserveMagnitude"></param>
+        public virtual void AddForce(
+            Vector3 force,
+            float magnitude,
+            DotBounds dotBounds,
+            DurationMode durationMode = DurationMode.Instant,
+            FrictionMode frictionMode = FrictionMode.Against,
+            ReferenceMode referenceMode = ReferenceMode.Global,
+            bool preserveMagnitude = false
+        )
+        {
+            if (!TryApplyContacts(ref force, dotBounds, preserveMagnitude)) return;
+            if (!TryApplyZones(ref magnitude)) return;
+            if (!TryApplyFrictionMode(ref force, frictionMode)) return;
+            if (!TryApplyDurationMode(ref force, durationMode)) return;
+            if (!TryApplyReferenceMode(ref force, magnitude, referenceMode)) return;
+            body.AddForce(force, ForceMode.VelocityChange);
+        }
+
+        /// <summary>
+        /// adds a force with default dot bounds
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="magnitude"></param>
+        /// <param name="durationMode"></param>
+        /// <param name="frictionMode"></param>
+        /// <param name="referenceMode"></param>
+        /// <param name="preserveMagnitude"></param>
         public virtual void AddForce(
             Vector3 force,
             float magnitude,
             DurationMode durationMode = DurationMode.Instant,
             FrictionMode frictionMode = FrictionMode.Against,
             ReferenceMode referenceMode = ReferenceMode.Global,
-            float nullifiedDot = -.707f,
-            float projectedDot = 0f,
-            bool preserveMagnitude = false,
-            bool requireContacts = false
+            bool preserveMagnitude = false
         )
         {
-            // contact mode
-            float maxFriction = 0;
-            int count = 0;
-            foreach (var (collider, data) in contacts)
-            {
-                float dot = force.Dot(data.Normal);
-                if (dot > projectedDot) continue;
-                if (dot < nullifiedDot) return;
-                float friction = collider.DynamicFriction();
-                if (friction > maxFriction) maxFriction = friction;
-                force = force.Project(data.Normal, preserveMagnitude);
-                count++;
-            }
-            if (requireContacts && count <= 0) return;
-            if (force.magnitude < minimumValue) return;
-
-            // friction mode
-            if (frictionMode != FrictionMode.None)
-            {
-                force *= frictionMode switch
-                {
-                    FrictionMode.With => maxFriction,
-                    FrictionMode.Against or _ => 1f - maxFriction
-                };
-                if (force.magnitude < minimumValue) return;
-            }
-
-            // duration mode 
-            if (durationMode == DurationMode.Continuous)
-            {
-                force *= Time.fixedDeltaTime;
-            }
-            if (force.magnitude < minimumValue) return;
-
-            // reference mode 
-            force = force.Clamp(magnitude, referenceMode switch
-            {
-                ReferenceMode.Local => localVelocity,
-                ReferenceMode.Global or _ => body.linearVelocity 
-            });
-            if (force.magnitude < minimumValue) return;
-
-            Debug.Log($"Force Applied {force}");
-            // apply force
-            body.AddForce(force, ForceMode.VelocityChange);
+            AddForce(force, magnitude, DotBounds.Default, durationMode, frictionMode, referenceMode, preserveMagnitude);
         }
 
-        protected virtual void ApplyGravity()
+        /// <summary>
+        /// add force assuming magnitude equals force magnitude
+        /// </summary>
+        /// <param name="force"></param>
+        /// <param name="durationMode"></param>
+        /// <param name="frictionMode"></param>
+        /// <param name="referenceMode"></param>
+        /// <param name="preserveMagnitude"></param>
+        public virtual void AddForce(
+            Vector3 force,
+            DurationMode durationMode = DurationMode.Instant,
+            FrictionMode frictionMode = FrictionMode.Against,
+            ReferenceMode referenceMode = ReferenceMode.Global,
+            bool preserveMagnitude = false
+        )
         {
-            AddForce(
-                force: Vector3.down * 40,
-                magnitude: 60,
-                durationMode: DurationMode.Continuous
-            );
+            AddForce(force, force.magnitude, DotBounds.Default, durationMode, frictionMode, referenceMode, preserveMagnitude);
         }
 
-        protected virtual void HandleCollision(Collision collision, bool preserveMagnitude = false)
-        {
-            if (contacts.TryGetValue(collision.collider, out CollisionData data))
-            {
-                data.Update(collision);
-            }
-            else
-            {
-                data = new CollisionData(collision);
-                contacts[collision.collider] = data;
-            }
+        #endregion
+        #region Unity Methods
 
-            UpdateContactVelocity();
-
-            if (collision.collider.gameObject.layer.ToLayer() == Layer.Launch) return;
-
-            body.linearVelocity = localVelocity.Project(
-                normal: data.Normal,
-                preserveMagnitude: preserveMagnitude) + contactVelocity;
-        }
-
-        protected virtual void OnCollisionEnter(Collision collision)
-        {
-            HandleCollision(collision);
-        }
-
-        protected virtual void OnCollisionStay(Collision collision)
-        {
-            HandleCollision(collision, true);
-        }
-
-        protected virtual void OnCollisionExit(Collision collision)
-        {
-            contacts.Remove(collision.collider);
-            UpdateContactVelocity();
-        }
-
-        protected virtual void ApplyContacts()
-        {
-            Vector3 delta;
-            Vector3 current;
-            foreach (var (collider, data) in contacts)
-            {
-                if (data.Rigidbody == null)
-                    continue;
-
-                current = data.Rigidbody.GetPointVelocity(data.Point);
-                delta = current - data.PointVelocity;
-
-                data.PointVelocity = current;
-                body.linearVelocity += delta;
-            }
-        }
-
+        /// <summary>
+        /// applies contacts and common forces
+        /// </summary>
         protected virtual void FixedUpdate()
         {
             ApplyContacts();
-            UpdateContactVelocity();
+            ApplyZones();
             ApplyGravity();
+            ApplyFriction();
+            if (!ValidStrength(localVelocity)) 
+            {
+                body.linearVelocity = (contactVelocity ?? Vector3.zero) + (zoneVelocity ?? Vector3.zero);
+            }
         }
+
+        /// <summary>
+        /// creates contact
+        /// </summary>
+        /// <param name="collision"></param>
+        protected virtual void OnCollisionEnter(Collision collision)
+        {
+            Contact contact = new(collision);
+            contacts[collision.collider] = contact;
+            body.linearVelocity = localVelocity.Project(contact.Normal, false) + contact.Velocity + (zoneVelocity ?? Vector3.zero);
+        }
+
+        /// <summary>
+        /// updates contact
+        /// </summary>
+        /// <param name="collision"></param>
+        protected virtual void OnCollisionStay(Collision collision)
+        {
+            if (!contacts.TryGetValue(collision.collider, out Contact contact))
+            {
+                OnCollisionEnter(collision);
+                return;
+            }
+            contact.Update(collision);
+            body.linearVelocity = localVelocity.Project(contact.Normal, true) + contact.Velocity + (zoneVelocity ?? Vector3.zero);
+        }
+
+        /// <summary>
+        /// removes contact
+        /// </summary>
+        /// <param name="collision"></param>
+        protected virtual void OnCollisionExit(Collision collision)
+        {
+            contacts.Remove(collision.collider);
+        }
+
+        /// <summary>
+        /// adds zone
+        /// </summary>
+        /// <param name="collider"></param>
+        protected virtual void OnTriggerEnter(Collider collider)
+        {
+            Zone zone = new(collider);
+            zones[collider] = zone;
+            
+            body.linearVelocity *= zone.Resistance;
+        }
+
+        /// <summary>
+        /// updates zone
+        /// </summary>
+        /// <param name="collider"></param>
+        protected virtual void OntriggerStay(Collider collider)
+        {
+            if (!zones.TryGetValue(collider, out Zone zone))
+            {
+                OnTriggerEnter(collider);
+                return;
+            }
+            zone.Update(collider);
+        }
+
+        /// <summary>
+        /// removes zone
+        /// </summary>
+        /// <param name="collider"></param>
+        protected virtual void OnTriggerExit(Collider collider)
+        {
+            zones.Remove(collider);
+        }
+
+        #endregion
     }
 }

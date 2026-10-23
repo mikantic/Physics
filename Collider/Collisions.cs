@@ -6,37 +6,63 @@ using UnityEngine;
 
 namespace Physics
 { 
-    public class CollisionData
+    public abstract class Data
     {
-        public Vector3 Normal { get; private set; }
-        public Vector3 Point { get; private set; }
-        public Vector3 PointVelocity { get; set; }
-        public Rigidbody Rigidbody { get; private set; } = null;
+        public Vector3 Velocity { get; private set; }
+        public Vector3 PreviousVelocity { get; private set; }
 
-        public CollisionData(Collision collision)
+        public Data()
+        {
+            Velocity = Vector3.zero;
+            PreviousVelocity = Vector3.zero;
+        }
+
+        public bool UpdateVelocity(Rigidbody rigidbody, out Vector3 delta)
+        {
+            delta = Vector3.zero;
+            if (rigidbody == null) return false;
+            PreviousVelocity = Velocity;
+            Velocity = GetVelocity(rigidbody);
+            delta = Velocity - PreviousVelocity;
+            return true;
+        }
+
+        protected virtual Vector3 GetVelocity(Rigidbody rigidbody) => rigidbody.linearVelocity;
+    }
+
+    public class Contact : Data
+    {
+        public Vector3 Point { get; private set; }
+        public Vector3 Normal { get; private set; }
+        public float Friction { get; private set; }
+        public float Bounciness { get; private set; }
+        public Contact(Collision collision) : base()
         {
             Update(collision);
-            PointVelocity = Vector3.zero;
-            if (collision.collider.gameObject.layer.ToLayer() == Layer.Launch) return;
-            Rigidbody = collision.collider.attachedRigidbody;
+            if (collision.gameObject.TryGetComponent(out SurfaceProperties properties))
+            {
+                Friction = properties.Friction;
+                Bounciness = properties.Bounciness;
+            }
         }
 
         public void Update(Collision collision)
         {
             Point = Vector3.zero;
             Normal = Vector3.zero;
-
-            int count = collision.contactCount;
-
-            for (int i = 0; i < count; i++)
+            if (collision.contactCount <= 0) return;
+            for (int i = 0; i < collision.contactCount; i++)
             {
-                ContactPoint contactPoint = collision.GetContact(i);
-                Point += contactPoint.point;
-                Normal += contactPoint.normal;
+                Point += collision.contacts[i].point;
+                Normal += collision.contacts[i].normal;
             }
+            Point /= collision.contactCount;
+            Normal = (Normal / collision.contactCount).normalized;
+        }
 
-            Point /= count;
-            Normal /= count;
+        protected override Vector3 GetVelocity(Rigidbody rigidbody)
+        {
+            return rigidbody.GetPointVelocity(Point);
         }
     }
 

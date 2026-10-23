@@ -4,6 +4,18 @@ using System.Linq;
 
 namespace Physics.Numerics
 {
+    public struct DotBounds
+    {
+        public float Nullified { get; }
+        public float Projected { get; }
+        private DotBounds(float nullified, float projected)
+        {
+            Nullified = nullified;
+            Projected = projected;
+        }
+        public static DotBounds Default => new(-0.707f, 0f);
+        public static DotBounds Project => new(-1f, 1f);
+    }
     public static class Math
     {
         
